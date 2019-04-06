@@ -1,13 +1,9 @@
 var express = require('express');
 var router = express.Router();
 var mysql = require('mysql');
+var { config } = require('../config.js');
 
-const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'da3002',
-  password: '3490vsjkllk52nm,a',
-  database: 'da3002'
-})
+const connection = mysql.createConnection(config.mysql);
 connection.connect(err => { if (err) throw err; });
 
 router.get('/', lookupUser, undevelopedEndpoint);
@@ -39,7 +35,8 @@ function undevelopedEndpoint(req, res, next) {
 function lookupUser(req, res, next) {
 	const
 		setUserName = req.get('X-Name-User'),
-		reportedUserId = parseInt(req.cookies.user);
+		reportedUserId = parseInt(req.cookies[config.cookieName]);
+
 	req.payload = {
 		meta: {}
 	};
@@ -51,42 +48,47 @@ function lookupUser(req, res, next) {
 				'SELECT * FROM User WHERE id=?',
 				[ userId ],
 				(err, result) => {
-					req.payload.meta.foundUser = userId;
-					req.user = result;
+					req.payload.meta.foundUser = result[0];
+					req.me = result[0];
 					resolve(result);
 				}
 			);		
 		})
 	}
 
-	if (reportedUserId) {
-		getUserById(reportedUserId).then((user) => {
-			next();
-		})
-	} else {
-		if (setUserName) {
-			req.payload.meta.namedUser = setUserName;
+	new Promise((resolve, reject) => {
+		if (!reportedUserId) {
+			// First visit ever (no cookie)
+			connection.query(
+				'INSERT INTO User (name) VALUES(?)',
+				[ setUserName || config.anonymousUserName ],
+				(err, result) => {
+					req.payload.meta.createdUser = result.insertId;
+					res.cookie(
+						config.cookieName,
+						result.insertId,
+						{
+							maxAge: config.cookieExpireSeconds
+						}
+					);
+					resolve(result.insertId);
+				}
+			)
+		} else if (setUserName) {
+			// Subsequent visit, with user naming request
+			connection.query(
+				'UPDATE User SET name=? WHERE id=?',
+				[ setUserName, reportedUserId ],
+				(err, result) => {
+					resolve(reportedUserId)
+				}
+			);
+		} else {
+			resolve(reportedUserId);
 		}
-		const newUserName = setUserName || 'Anonymous';
-		new Promise((resolve, reject) => {
-			if (!reportedUserId) {
-				connection.query(
-					'INSERT INTO User (name) VALUES(?)',
-					[ newUserName ],
-					(err, result) => {
-						req.payload.meta.createdUser = result.insertId;
-						res.cookie('user', result.insertId, {maxAge: 360000});
-						resolve(result.insertId);
-					}
-				)
-			} else {
-				resolve(reportedUserId);
-			}
-		}).then((userId) => {
-			getUserById(userId).then(user => next());
-		})
-		//req.payload.meta.anonymousUser = true;
-	}
+	}).then((userId) => {
+		getUserById(userId).then(user => next());
+	})
 }
 
 module.exports = router;
