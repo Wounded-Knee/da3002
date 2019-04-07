@@ -75,42 +75,16 @@ function lookupUser(req, res, next) {
 		reportedUserId = parseInt(req.cookies[config.cookieName]);
 
 	req.payload = {
-		meta: {},
 		me: {}
 	};
 
-	const getUserById = (userId) => {
-		return new Promise((resolve, reject) => {
-			connection.query(
-				'SELECT * FROM User WHERE id=?',
-				[ userId ],
-				(err, result) => {
-					if (err) {
-						reject(err);
-						throw new Error(err);
-					} else if (result.length === 0) {
-						res.json({
-							error: "UserID #"+userId+" doesn't exist."
-						});
-					} else {
-						console.log(result);
-						req.payload.meta.foundUser = result[0];
-						req.payload.me = result[0];
-						resolve(result);
-					}
-				}
-			);		
-		})
-	}
-
-	new Promise((resolve, reject) => {
+	return new Promise((resolve, reject) => {
 		if (!reportedUserId) {
 			// First visit ever (no cookie)
 			connection.query(
 				'INSERT INTO User (name) VALUES(?)',
 				[ setUserName || config.anonymousUserName ],
 				(err, result) => {
-					req.payload.meta.createdUser = result.insertId;
 					res.cookie(
 						config.cookieName,
 						result.insertId,
@@ -134,8 +108,105 @@ function lookupUser(req, res, next) {
 			resolve(reportedUserId);
 		}
 	}).then((userId) => {
-		getUserById(userId).then(user => next());
+		getUserById(userId).then(user => {
+			req.payload.me = user;
+			next();
+		});
 	})
+}
+
+// Returns a promise which resolves with user data
+function getUserById(userId) {
+	return new Promise((resolve, reject) => {
+		connection.query(
+			'SELECT * FROM User WHERE id=?',
+			[ userId ],
+			(err, result) => {
+				if (err) {
+					reject(err);
+					throw new Error(err);
+				} else if (result.length === 0) {
+					res.json({
+						error: "UserID #"+userId+" doesn't exist."
+					});
+				} else {
+					resolve(result[0]);
+				}
+			}
+		);
+	}).then(me => {
+		return new Promise((resolve, reject) => {
+			getTagsByUserId(userId).then(tags => {
+				resolve({
+					...me,
+					tags: tags
+				});
+			})
+		})
+	}).then(me => {
+		return new Promise((resolve, reject) => {
+			getRelationsByUserId(userId).then(relations => {
+				resolve({
+					...me,
+					relations: relations
+				})
+			})
+		})
+	})
+}
+
+function getRelationsByUserId(userId) {
+	return new Promise((resolve, reject) => {
+		connection.query(
+			`SELECT
+					Relationship.*,
+					UserRelationship.privacyLevel_id
+				FROM (User
+					LEFT JOIN UserRelationship
+						ON User.id = UserRelationship.user_id
+					LEFT JOIN User as Relationship
+						ON UserRelationship.relationship_id = Relationship.id
+				)
+				WHERE User.id = ?
+				AND Relationship.id IS NOT NULL`,
+			[ userId ],
+			(err, result) => {
+				if (err) {
+					throw new Error(err);
+				} else {
+					resolve(result);
+				}
+			}
+		);
+	})
+}
+
+function getTagsByUserId(userId) {
+	return new Promise((resolve, reject) => {
+		connection.query(
+			`SELECT
+					Tag.id,
+					Tag.name,
+					Tag.emoji,
+					User_Tag.privacyLevel_id
+				FROM (User
+					LEFT JOIN User_Tag
+						ON User.id = User_Tag.user_id
+					LEFT JOIN Tag
+						ON User_Tag.tag_id = Tag.id
+				)
+				WHERE User.id = ?
+				AND Tag.id IS NOT NULL`,
+			[ userId ],
+			(err, result) => {
+				if (err) {
+					throw new Error(err);
+				} else {
+					resolve(result);
+				}
+			}
+		);
+	});
 }
 
 module.exports = router;
