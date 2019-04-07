@@ -14,15 +14,52 @@ router.get('/users/me', lookupUser, undevelopedEndpoint);
 router.get('/tests', lookupUser, undevelopedEndpoint);
 
 router.post('/tests', lookupUser, (req, res, next) => {
-	connection.query(
-		'INSERT INTO Test (name, question) VALUES(?, ?)',
-		[req.body.name, req.body.question],
-		function(err, result) {
-			req.payload.error = err;
-			req.result = result;
+	new Promise((resolve, reject) => {
+
+		// Record Test
+
+		connection.query(
+			'INSERT INTO Test (name, question) VALUES(?, ?)',
+			[req.body.name, req.body.question],
+			function(err, result) {
+				if (result.insertId !== undefined) {
+					resolve(result);
+				} else {
+					reject(err);
+				}
+			}
+		);
+	}).then(result => {
+
+		// Record Choices
+
+		Promise.all(
+			req.body.choices.map(choice => {
+				return new Promise((resolve, reject) => {
+					connection.query(
+						'INSERT INTO Answer (test_id, choice) VALUES(?, ?)',
+						[ result.insertId, choice ],
+						(err, result) => {
+							if (!err) {
+								resolve(result);
+							} else {
+								reject(err);
+							}
+						}
+					);
+				});
+			})
+		).then(() => {
+
+			// Return Payload
+
 			res.json(req.payload);
-		}
-	);
+		}).catch(err => {
+			console.error(err);
+		})
+	}).catch(err => {
+		throw new Error(err);
+	});
 });
 
 router.put('/tests/:testId/answer/:answerId', lookupUser, undevelopedEndpoint);
