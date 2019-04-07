@@ -14,15 +14,52 @@ router.get('/users/me', lookupUser, undevelopedEndpoint);
 router.get('/tests', lookupUser, undevelopedEndpoint);
 
 router.post('/tests', lookupUser, (req, res, next) => {
-	connection.query(
-		'INSERT INTO Test (name, question) VALUES(?, ?)',
-		[req.body.name, req.body.question],
-		function(err, result) {
-			req.payload.error = err;
-			req.result = result;
+	new Promise((resolve, reject) => {
+
+		// Record Test
+
+		connection.query(
+			'INSERT INTO Test (name, question, privacyLevel_id, user_id) VALUES(?, ?, ?, ?)',
+			[req.body.name, req.body.question, 1, req.payload.me.id ],
+			function(err, result) {
+				if (err) {
+					reject(err);
+				} else {
+					resolve(result);
+				}
+			}
+		);
+	}).then(result => {
+
+		// Record Choices
+
+		Promise.all(
+			req.body.choices.map(choice => {
+				return new Promise((resolve, reject) => {
+					connection.query(
+						'INSERT INTO Tag (test_id, name, emoji, summary, choice) VALUES(?, ?, ?, ?, ?)',
+						[ result.insertId, choice.name, choice.emoji, choice.summary, choice.choice ],
+						(err, result) => {
+							if (!err) {
+								resolve(result);
+							} else {
+								reject(err);
+							}
+						}
+					);
+				});
+			})
+		).then(() => {
+
+			// Return Payload
+
 			res.json(req.payload);
-		}
-	);
+		}).catch(err => {
+			throw new Error(err);
+		})
+	}).catch(err => {
+		throw new Error(err);
+	});
 });
 
 router.put('/tests/:testId/answer/:answerId', lookupUser, undevelopedEndpoint);
@@ -38,9 +75,9 @@ function lookupUser(req, res, next) {
 		reportedUserId = parseInt(req.cookies[config.cookieName]);
 
 	req.payload = {
-		meta: {}
+		meta: {},
+		me: {}
 	};
-	req.user = {};
 
 	const getUserById = (userId) => {
 		return new Promise((resolve, reject) => {
@@ -48,9 +85,19 @@ function lookupUser(req, res, next) {
 				'SELECT * FROM User WHERE id=?',
 				[ userId ],
 				(err, result) => {
-					req.payload.meta.foundUser = result[0];
-					req.me = result[0];
-					resolve(result);
+					if (err) {
+						reject(err);
+						throw new Error(err);
+					} else if (result.length === 0) {
+						res.json({
+							error: "UserID #"+userId+" doesn't exist."
+						});
+					} else {
+						console.log(result);
+						req.payload.meta.foundUser = result[0];
+						req.payload.me = result[0];
+						resolve(result);
+					}
 				}
 			);		
 		})
