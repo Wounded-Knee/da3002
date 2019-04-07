@@ -6,6 +6,9 @@ exports.config = {
 		database: '',
 		charset: 'utf8mb4',
 	},
-	cookieExpireSeconds: 60*60*24*365,
-	anonymousUserName: 'Anonymous'
+	cookie: {
+		name: 'id',
+		expireSeconds: 60*60*24*365,
+	},
+	anonymousUserName: 'Anonymous',
 };
