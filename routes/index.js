@@ -1,12 +1,33 @@
 var express = require('express');
 var router = express.Router();
 var mysql = require('mysql');
+var pluck = require('pluck');
 var { config } = require('../config.js');
 
 const connection = mysql.createConnection(config.mysql);
 connection.connect(err => { if (err) throw err; });
 
 router.get('/', lookupUser, undevelopedEndpoint);
+
+router.put('/user/:userId/privacy/:privacyLevel_id', lookupUser, (req, res, next) => {
+	const
+		userId = parseInt(req.params.userId),
+		privacyLevel_id = parseInt(req.params.privacyLevel_id);
+	new Promise((resolve, reject) => {
+		connection.query(
+			`
+				REPLACE INTO UserRelationship
+					(user_id, relationship_id, privacyLevel_id)
+				VALUES
+					(?, ?, ?)
+			`,
+			[ req.payload.me.id, userId, privacyLevel_id ],
+			function(err, result) {
+				res.json(!err);
+			}
+		)
+	});
+});
 
 router.get('/users', lookupUser, (req, res, next) => {
 	res.json(req.payload.me.relations);
@@ -86,12 +107,16 @@ router.get('/users/me', lookupUser, (req, res, next) => {
 	res.json(req.payload.me);
 });
 
+router.get('/user/:userId', lookupUser, (req, res, next) => {
+	getUserById(parseInt(req.params.userId)).then(userData => res.json(userData));
+});
+
 router.get('/tests', lookupUser, (req, res, next) => {
-	getTests().then(tests => res.json(tests));
+	getTests(req).then(tests => res.json(tests));
 });
 
 router.get('/tests/:testId', lookupUser, (req, res, next) => {
-	getTests(req.params.testId).then(tests => res.json(tests));
+	getTests(req, req.params.testId).then(tests => res.json(tests));
 });
 
 router.post('/tests', lookupUser, (req, res, next) => {
@@ -157,7 +182,7 @@ router.put('/tests/:testId/answer/:answerId', lookupUser, (req, res, next) => {
 				if (result.length === 0) {
 					resolve();
 				} else {
-					res.json(req.payload);
+					req.payload.error = "User has already given that answer.";
 					reject();
 				}
 			}
@@ -181,9 +206,6 @@ router.put('/tests/:testId/answer/:answerId', lookupUser, (req, res, next) => {
 		)
 	}).catch(err => {
 		if (!err) {
-			res.json({
-				error: "User has already given that answer."
-			});
 		} else {
 			throw new Error(err);
 		}
@@ -242,7 +264,7 @@ function lookupUser(req, res, next) {
 	})
 }
 
-function getTests(testId) {
+function getTests(req, testId) {
 	return new Promise((resolve, reject) => {
 		connection.query(
 			`SELECT
@@ -283,7 +305,23 @@ function getTests(testId) {
 								choice: row.tagChoice,
 							});
 						}
-						tests = tests.filter(test => test !== null);
+						tests = tests.filter(test => {
+							const
+								testTagIds = pluck('id', test.tags),
+								myTagIds = pluck('id', req.payload.me.tags);
+
+							const intersection = [testTagIds, myTagIds].shift().filter(function(v) {
+								return [testTagIds, myTagIds].every(function(a) {
+									return a.indexOf(v) !== -1;
+								});
+							});
+
+							const testNotNull = test !== null;
+
+							if (testNotNull && intersection.length === 0) {
+								return true;
+							}
+						});
 						if (testId) tests = tests[0];
 						resolve(tests);
 					}
