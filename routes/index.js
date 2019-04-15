@@ -1,4 +1,6 @@
 var express = require('express');
+var validate = require('express-validation');
+var validation = require('../validation.js');
 var router = express.Router();
 var mysql = require('mysql');
 var pluck = require('pluck');
@@ -103,6 +105,26 @@ router.get('/tag/:tagId', lookupUser, (req, res, next) => {
 	});
 });
 
+router.put('/tag/:tagId/privacy/:privacyLevel_id', lookupUser, (req, res, next) => {
+	const
+		tagId = parseInt(req.params.tagId),
+		privacyLevel_id = parseInt(req.params.privacyLevel_id);
+	new Promise((resolve, reject) => {
+		connection.query(
+			`
+				REPLACE INTO User_Tag
+					(user_id, tag_id, privacyLevel_id)
+				VALUES
+					(?, ?, ?)
+			`,
+			[ req.payload.me.id, tagId, privacyLevel_id ],
+			function(err, result) {
+				res.json(!err);
+			}
+		)
+	});
+});
+
 router.get('/users/me', lookupUser, (req, res, next) => {
 	res.json(req.payload.me);
 });
@@ -119,7 +141,7 @@ router.get('/tests/:testId', lookupUser, (req, res, next) => {
 	getTests(req, req.params.testId).then(tests => res.json(tests));
 });
 
-router.post('/tests', lookupUser, (req, res, next) => {
+router.post('/tests', validate(validation.postTests), lookupUser, (req, res, next) => {
 	new Promise((resolve, reject) => {
 
 		// Record Test
@@ -169,47 +191,22 @@ router.post('/tests', lookupUser, (req, res, next) => {
 });
 
 router.put('/tests/:testId/answer/:answerId', lookupUser, (req, res, next) => {
-	return new Promise((resolve, reject) => {
-		// Check if this record already exists
-		connection.query(
-			`SELECT * FROM User_Tag WHERE tag_id IN (
-				SELECT id FROM Tag WHERE test_id = (
-					SELECT test_id FROM Tag WHERE id = ?
-				)
-			) AND user_id = ?`,
-			[ parseInt(req.params.answerId), parseInt(req.payload.me.id) ],
-			(err, result) => {
-				if (result.length === 0) {
-					resolve();
-				} else {
-					req.payload.error = "User has already given that answer.";
-					reject();
-				}
+	connection.query(
+		`REPLACE INTO User_Tag
+		(user_id, tag_id, privacyLevel_id)
+		VALUES(?, ?, 1)
+		`,
+		[ parseInt(req.payload.me.id), parseInt(req.params.answerId) ],
+		(err, result) => {
+			if (err) {
+				throw new Error(err);
+			} else {
+				lookupUser(req, res, () => {
+					res.json(req.payload);
+				});
 			}
-		);
-	}).then(() => {
-		connection.query(
-			`INSERT INTO User_Tag
-			(user_id, tag_id, privacyLevel_id)
-			VALUES(?, ?, 1)
-			`,
-			[ parseInt(req.payload.me.id), parseInt(req.params.answerId) ],
-			(err, result) => {
-				if (err) {
-					throw new Error(err);
-				} else {
-					lookupUser(req, res, () => {
-						res.json(req.payload);
-					});
-				}
-			}
-		)
-	}).catch(err => {
-		if (!err) {
-		} else {
-			throw new Error(err);
 		}
-	});
+	);
 });
 
 function undevelopedEndpoint(req, res, next) {
@@ -279,7 +276,9 @@ function getTests(req, testId) {
 				FROM (Test
 					LEFT JOIN Tag
 						ON Test.id = Tag.test_id
-				) ` + ((testId) ? 'WHERE Test.id = ?' : ''),
+				) ` + ((testId) ? 'WHERE Test.id = ?' : '') + `
+				ORDER BY testId DESC
+			`,
 			(testId ? [ testId ] : []),
 			(err, result) => {
 					if (err) {
@@ -323,6 +322,7 @@ function getTests(req, testId) {
 							}
 						});
 						if (testId) tests = tests[0];
+						tests.sort((testA, testB) => testB.id - testA.id ); // Newest tests first
 						resolve(tests);
 					}
 			})
@@ -366,6 +366,8 @@ function getUserById(userId) {
 				})
 			})
 		})
+	}).catch(err => {
+		res.json(err);
 	})
 }
 
