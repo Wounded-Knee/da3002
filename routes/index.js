@@ -130,7 +130,7 @@ router.get('/users/me', lookupUser, (req, res, next) => {
 });
 
 router.get('/user/:userId', lookupUser, (req, res, next) => {
-	getUserById(parseInt(req.params.userId)).then(userData => res.json(userData));
+	getUserById(parseInt(req.params.userId), parseInt(req.payload.me.id)).then(userData => res.json(userData));
 });
 
 router.get('/tests', lookupUser, (req, res, next) => {
@@ -254,7 +254,7 @@ function lookupUser(req, res, next) {
 			resolve(reportedUserId);
 		}
 	}).then((userId) => {
-		getUserById(userId).then(user => {
+		getUserById(userId, userId).then(user => {
 			req.payload.me = user;
 			next();
 		});
@@ -330,7 +330,7 @@ function getTests(req, testId) {
 }
 
 // Returns a promise which resolves with user data
-function getUserById(userId) {
+function getUserById(userId, viewingUserId) {
 	return new Promise((resolve, reject) => {
 		connection.query(
 			'SELECT * FROM User WHERE id=?',
@@ -350,7 +350,7 @@ function getUserById(userId) {
 		);
 	}).then(me => {
 		return new Promise((resolve, reject) => {
-			getTagsByUserId(userId).then(tags => {
+			getTagsByUserId(userId, viewingUserId).then(tags => {
 				resolve({
 					...me,
 					tags: tags
@@ -367,7 +367,7 @@ function getUserById(userId) {
 			})
 		})
 	}).catch(err => {
-		res.json(err);
+		throw(err);
 	})
 }
 
@@ -397,23 +397,38 @@ function getRelationsByUserId(userId) {
 	})
 }
 
-function getTagsByUserId(userId) {
+function getTagsByUserId(userId, viewingUserId) {
 	return new Promise((resolve, reject) => {
+		const self = (userId !== viewingUserId);
+		const sql = `SELECT
+				Tag.id,
+				Tag.name,
+				Tag.emoji,
+				User_Tag.privacyLevel_id
+				${self ? `
+				, UserRelationship.privacyLevel_id as userRelPL
+				` : ''}
+			FROM (User
+				LEFT JOIN User_Tag
+					ON User.id = User_Tag.user_id
+			${self ? `
+				LEFT JOIN UserRelationship
+					ON User.id = UserRelationship.user_id
+						AND UserRelationship.relationship_id = ?
+						AND User_Tag.privacyLevel_id >= UserRelationship.privacyLevel_id
+			` : ''}
+				LEFT JOIN Tag
+					ON User_Tag.tag_id = Tag.id
+			)
+			WHERE User.id = ?
+			AND Tag.id IS NOT NULL
+			${self ? `
+	            AND UserRelationship.privacyLevel_id IS NOT NULL
+			` : ''}`;
+		console.log(sql);
 		connection.query(
-			`SELECT
-					Tag.id,
-					Tag.name,
-					Tag.emoji,
-					User_Tag.privacyLevel_id
-				FROM (User
-					LEFT JOIN User_Tag
-						ON User.id = User_Tag.user_id
-					LEFT JOIN Tag
-						ON User_Tag.tag_id = Tag.id
-				)
-				WHERE User.id = ?
-				AND Tag.id IS NOT NULL`,
-			[ userId ],
+			sql,
+			self ? [ viewingUserId, userId ] : [ userId ],
 			(err, result) => {
 				if (err) {
 					throw new Error(err);
