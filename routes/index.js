@@ -11,6 +11,22 @@ connection.connect(err => { if (err) throw err; });
 
 router.get('/', lookupUser, undevelopedEndpoint);
 
+router.get('/become/:userId',  validate(validation.getBecome), (req, res, next) => {
+	const userId = parseInt(req.params.userId);
+	res.cookie(
+		config.cookie.name,
+		userId,
+		{
+			domain: '.'+req.headers.host.split(':')[0],
+			maxAge: config.cookie.expireSeconds,
+		}
+	);
+	res.json({
+		success: "Cookie set"
+	})
+	next();
+});
+
 router.put('/user/:userId/privacy/:privacyLevel_id', lookupUser, (req, res, next) => {
 	const
 		userId = parseInt(req.params.userId),

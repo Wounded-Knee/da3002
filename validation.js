@@ -1,6 +1,11 @@
 var Joi = require('joi');
 
 module.exports = {
+	getBecome: {
+		params: {
+			userId: Joi.number().integer().required(),
+		}
+	},
 	putAnswer: {
 		params: {
 			answerId: Joi.number().integer().required(),
