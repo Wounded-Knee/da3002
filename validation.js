@@ -1,6 +1,12 @@
 var Joi = require('joi');
 
 module.exports = {
+	putAnswer: {
+		params: {
+			answerId: Joi.number().integer().required(),
+			testId: Joi.number().integer().required(),
+		}
+	},
 	postTests: {
 		body: {
 			question: Joi.string().required(),

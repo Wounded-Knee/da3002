@@ -192,7 +192,7 @@ router.post('/tests', validate(validation.postTests), lookupUser, (req, res, nex
 	});
 });
 
-router.put('/tests/:testId/answer/:answerId', lookupUser, (req, res, next) => {
+router.put('/tests/:testId/answer/:answerId', validate(validation.putAnswer), lookupUser, (req, res, next) => {
 	connection.query(
 		`REPLACE INTO User_Tag
 		(user_id, tag_id, privacyLevel_id)
@@ -306,25 +306,29 @@ function getTests(req, testId) {
 								choice: row.tagChoice,
 							});
 						}
-						tests = tests.filter(test => {
-							const
-								testTagIds = pluck('id', test.tags),
-								myTagIds = pluck('id', req.payload.me.tags);
+						tests = tests.filter(test => test !== undefined);
+						if (!testId) {
+							tests = tests.filter(test => {
+								const
+									testTagIds = pluck('id', test.tags),
+									myTagIds = pluck('id', req.payload.me.tags);
 
-							const intersection = [testTagIds, myTagIds].shift().filter(function(v) {
-								return [testTagIds, myTagIds].every(function(a) {
-									return a.indexOf(v) !== -1;
+								const intersection = [testTagIds, myTagIds].shift().filter(function(v) {
+									return [testTagIds, myTagIds].every(function(a) {
+										return a.indexOf(v) !== -1;
+									});
 								});
+
+								const testNotNull = test !== null;
+
+								if (testNotNull && intersection.length === 0) {
+									return true;
+								}
 							});
-
-							const testNotNull = test !== null;
-
-							if (testNotNull && intersection.length === 0) {
-								return true;
-							}
-						});
-						if (testId) tests = tests[0];
-						tests.sort((testA, testB) => testB.id - testA.id ); // Newest tests first
+							tests.sort((testA, testB) => testB.id - testA.id ); // Newest tests first
+						} else {
+							tests = tests[0];
+						}
 						resolve(tests);
 					}
 			})
