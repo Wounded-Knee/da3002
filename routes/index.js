@@ -32,7 +32,9 @@ router.put('/user/:userId/privacy/:privacyLevel_id', lookupUser, (req, res, next
 });
 
 router.get('/users', lookupUser, (req, res, next) => {
-	res.json(req.payload.me.relations);
+	getUsers(req.payload.me.id).then(vals => {
+		res.json(vals);
+	});
 });
 
 router.get('/tag/:tagId', lookupUser, (req, res, next) => {
@@ -371,6 +373,53 @@ function getUserById(userId, viewingUserId) {
 	})
 }
 
+function getUsers(viewingUserId) {
+	return new Promise((resolve, reject) => {
+		connection.query(
+			'SELECT * FROM User',
+			[],
+			(err, result) => {
+				if (err) {
+					reject(err);
+					throw new Error(err);
+				} else {
+					resolve(result);
+				}
+			}
+		);
+	}).then(us => {
+		return new Promise((resolve, reject) => {
+			Promise.all([
+				...us.map(her => {
+					return new Promise((resolve, reject) => {
+						getTagsByUserId(her.id, viewingUserId).then(herTags => {
+							resolve({
+								...her,
+								tags: herTags
+							});
+						})
+					})
+				}),
+
+				...us.map(her => {
+					return new Promise((resolve, reject) => {
+						getRelationsByUserId(her.id).then(herRelations => {
+							resolve({
+								...her,
+								relations: herRelations
+							});
+						})
+					})
+				})
+			]).then(vals => {
+				resolve(vals);
+			});
+		})
+	}).catch(err => {
+		throw(err);
+	})
+}
+
 function getRelationsByUserId(userId) {
 	return new Promise((resolve, reject) => {
 		connection.query(
@@ -425,7 +474,6 @@ function getTagsByUserId(userId, viewingUserId) {
 			${self ? `
 	            AND UserRelationship.privacyLevel_id IS NOT NULL
 			` : ''}`;
-		console.log(sql);
 		connection.query(
 			sql,
 			self ? [ viewingUserId, userId ] : [ userId ],
