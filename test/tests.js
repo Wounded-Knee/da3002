@@ -1,3 +1,4 @@
+var fs = require('fs');
 const request = require('supertest');
 const express = require('express');
 const app = require('../app');
@@ -35,8 +36,35 @@ describe('GET /users', function() {
 				}
 				return true;
 			})
-      .end(function(err, res){
-       	done(err || undefined);
+			.end(function(err, res){
+				done(err || undefined);
+			});
+	});
+});
+
+describe('GET /node/1', function() {
+	it('gets node', function(done) {
+		request(app)
+			.get('/node/1')
+			.set('Accept', 'application/json')
+			.expect('Content-Type', /json/)
+			.expect(200)
+			.end((err, res) => {
+				const { body: node } = res;
+
+				if (
+					parseInt(node.id)				>			0						&&
+					node.text								!==		undefined		&&
+					node.ratification				!==		undefined		&&
+					node.creation						!==		undefined		&&
+					node.handle							!==		undefined		&&
+					node.children.length		===		2						&&
+					parseInt(node.user_id)	>			0
+				) {
+					done();
+				} else {
+					done(new Error("Test failed: " + JSON.stringify(node)));
+				};
 			});
 	});
 });

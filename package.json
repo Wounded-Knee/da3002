@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www",
-    "test": "mocha"
+    "start": "cross-env da3002env=dev node ./bin/www",
+    "test": "cross-env da3002env=test ./setupTestDB.sh"
   },
   "dependencies": {
     "body-parser": "^1.18.3",
@@ -16,11 +16,13 @@
     "http-errors": "~1.6.2",
     "jade": "~1.11.0",
     "joi": "^14.3.1",
+    "krauter": "^3.1.13",
     "morgan": "~1.9.0",
     "mysql": "^2.16.0",
     "pluck": "0.0.4"
   },
   "devDependencies": {
+    "cross-env": "^5.2.0",
     "mocha": "^6.1.4",
     "supertest": "^4.0.2"
   }
