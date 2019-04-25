@@ -7,10 +7,10 @@ var logger = require('morgan');
 var cors = require('cors');
 
 const routers = {
-	index: require('./routes/index'),
+//	index: require('./routes/index'),
 	node: require('./routes/node'),
 	user: require('./routes/user'),
-	relation: require('./routes/relation'),
+	// relation: require('./routes/relation'),
 };
 
 var app = express();
@@ -32,9 +32,9 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 //app.use('/', routers.index);
-app.use('/node', routers.node);
-app.use('/user', routers.user);
-app.use('/relation', routers.relation);
+app.use('/', routers.node);
+app.use('/', routers.user);
+//app.use('/relation', routers.relation);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -47,12 +47,15 @@ app.use(function(err, req, res, next) {
 	res.locals.message = err.message;
 	res.locals.error = process.env.da3002env === 'dev' ? err : {};
 
-	console.log(err.message);
+	console.log(
+		err.message,
+		err.stack
+	);
 
 	// render the error page
 	res.status(err.status || 500);
 	res.json({
-		error: err
+		error: err,
 	});
 });
 

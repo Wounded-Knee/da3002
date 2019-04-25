@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS `da3002-test`.`User` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(45) NULL,
   `avatar` VARCHAR(45) NULL,
+  `created` DATETIME NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB;
 
@@ -37,7 +38,7 @@ ENGINE = InnoDB;
 DROP TABLE IF EXISTS `da3002-test`.`Privacy` ;
 
 CREATE TABLE IF NOT EXISTS `da3002-test`.`Privacy` (
-  `id` INT NOT NULL DEFAULT 0,
+  `id` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(45) NULL,
   `value` INT NULL,
   PRIMARY KEY (`id`))
@@ -53,6 +54,8 @@ CREATE TABLE IF NOT EXISTS `da3002-test`.`Relationship` (
   `user_id` INT NOT NULL,
   `relationship_id` INT NOT NULL,
   `privacy_id` INT NOT NULL,
+  `associated` DATETIME NULL,
+  `disassociated` DATETIME NULL,
   PRIMARY KEY (`user_id`, `relationship_id`),
   CONSTRAINT `fk_UserRelationship_User1`
     FOREIGN KEY (`user_id`)
@@ -79,9 +82,8 @@ DROP TABLE IF EXISTS `da3002-test`.`Node` ;
 
 CREATE TABLE IF NOT EXISTS `da3002-test`.`Node` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `text` VARCHAR(5000) NULL,
   `user_id` INT NOT NULL,
-  `ratification` DATETIME NULL,
+  `text` VARCHAR(5000) NULL,
   `creation` DATETIME NULL,
   `handle` VARCHAR(45) NULL,
   PRIMARY KEY (`id`),
@@ -101,6 +103,7 @@ DROP TABLE IF EXISTS `da3002-test`.`Junction` ;
 CREATE TABLE IF NOT EXISTS `da3002-test`.`Junction` (
   `node_id` INT NOT NULL,
   `child_node_id` INT NOT NULL,
+  `ratification` DATETIME NULL,
   CONSTRAINT `fk_Junction_Nodes1`
     FOREIGN KEY (`node_id`)
     REFERENCES `da3002-test`.`Node` (`id`)
@@ -120,9 +123,11 @@ ENGINE = InnoDB;
 DROP TABLE IF EXISTS `da3002-test`.`Type` ;
 
 CREATE TABLE IF NOT EXISTS `da3002-test`.`Type` (
-  `id` INT NOT NULL,
+  `id` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(45) NULL,
-  PRIMARY KEY (`id`))
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `id_UNIQUE` (`id` ASC),
+  UNIQUE INDEX `name_UNIQUE` (`name` ASC))
 ENGINE = InnoDB;
 
 
@@ -136,6 +141,8 @@ CREATE TABLE IF NOT EXISTS `da3002-test`.`User_Node` (
   `node_id` INT NOT NULL,
   `privacy_id` INT NOT NULL,
   `type_id` INT NOT NULL,
+  `associated` DATETIME NULL,
+  `expires` DATETIME NULL,
   CONSTRAINT `fk_User_Node_User1`
     FOREIGN KEY (`user_id`)
     REFERENCES `da3002-test`.`User` (`id`)
@@ -154,6 +161,45 @@ CREATE TABLE IF NOT EXISTS `da3002-test`.`User_Node` (
   CONSTRAINT `fk_User_Node_Type1`
     FOREIGN KEY (`type_id`)
     REFERENCES `da3002-test`.`Type` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `da3002-test`.`PrerequisiteType`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `da3002-test`.`PrerequisiteType` ;
+
+CREATE TABLE IF NOT EXISTS `da3002-test`.`PrerequisiteType` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `type` VARCHAR(45) NULL,
+  PRIMARY KEY (`id`))
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `da3002-test`.`Prerequisite`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `da3002-test`.`Prerequisite` ;
+
+CREATE TABLE IF NOT EXISTS `da3002-test`.`Prerequisite` (
+  `node_id` INT NOT NULL,
+  `prerequisite_node_id` INT NOT NULL,
+  `prerequisiteType_id` INT NOT NULL,
+  CONSTRAINT `fk_Prerequisites_Node1`
+    FOREIGN KEY (`node_id`)
+    REFERENCES `da3002-test`.`Node` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_Prerequisites_Node2`
+    FOREIGN KEY (`prerequisite_node_id`)
+    REFERENCES `da3002-test`.`Node` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_Prerequisites_PrerequisiteType1`
+    FOREIGN KEY (`prerequisiteType_id`)
+    REFERENCES `da3002-test`.`PrerequisiteType` (`id`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
@@ -182,11 +228,22 @@ COMMIT;
 -- -----------------------------------------------------
 START TRANSACTION;
 USE `da3002-test`;
-INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (0, 'Null');
-INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (1, 'Visit');
-INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (2, 'Sarcastic');
-INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (3, 'Joking');
-INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (4, 'Serious');
+INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (1, 'Null');
+INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (2, 'Visit');
+INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (3, 'Sarcastic');
+INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (4, 'Joking');
+INSERT INTO `da3002-test`.`Type` (`id`, `name`) VALUES (5, 'Serious');
+
+COMMIT;
+
+
+-- -----------------------------------------------------
+-- Data for table `da3002-test`.`PrerequisiteType`
+-- -----------------------------------------------------
+START TRANSACTION;
+USE `da3002-test`;
+INSERT INTO `da3002-test`.`PrerequisiteType` (`id`, `type`) VALUES (1, 'INCLUDE');
+INSERT INTO `da3002-test`.`PrerequisiteType` (`id`, `type`) VALUES (2, 'EXCLUDE');
 
 COMMIT;
 
