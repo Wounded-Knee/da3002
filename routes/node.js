@@ -1,3 +1,4 @@
+var createError = require('http-errors');
 var router = require('../router')
 
 router
@@ -49,8 +50,8 @@ router
 	.get('/node/:nodeId([0-9]+)',
 		`
 			INSERT INTO
-				User_Node
-					(user_id, node_id, privacy_id, type_id, associated, expires)
+				Knowledge
+					(user_id, node_id, privacy_id, knowledgeType_id, associated, expires)
 				VALUES
 					(:userId:, :params.nodeId:, 5, 2, :transactionDate:, NULL);
 		`,
@@ -90,9 +91,9 @@ router
 		`
 			INSERT INTO
 				Junction
-					(node_id, child_node_id)
+					(node_id, child_node_id, junctionType_id)
 				VALUES
-					(:params.parentNodeId:, :newNodeId:);
+					(:params.parentNodeId:, :newNodeId:, 2);
 		`,
 		`
 			SELECT * FROM Node WHERE id = :newNodeId:;
@@ -115,6 +116,16 @@ router
 			SELECT * FROM Node WHERE id = :data.insertId:;
 		`,
 		({ data }) => data[0],
+	)
+
+	.put('/node/:nodeId/relation/:childNodeId',
+		`
+			INSERT INTO
+				Knowledge
+					(user_id, node_id, privacy_id, knowledgeType_id, associated, expires)
+				VALUES
+					(:userId:, :params.nodeId:, 5, 3, :transactionDate:, NULL)
+		`
 	)
 ;
 

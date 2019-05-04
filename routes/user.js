@@ -3,33 +3,19 @@ const { getUserById, getUserRelationsById, setCookie } = require('../UserUtiliti
 
 router
 	.get('/user/all',
-		`SELECT * FROM User`,
+		`SELECT id FROM User`,
 		({ req, data }) => req.allUsers = data,
-		`
-			SELECT
-				User.*,
-				Relationship.user_id as relationOfUser_id,
-				Relationship.privacy_id
-			FROM User
-				LEFT JOIN
-					Relationship
-				ON
-					User.id = Relationship.relationship_id
-			WHERE User.id IN (
-				SELECT
-					Relationship.relationship_id
-				FROM
-					Relationship
-			)
-		`,
-		({ req, res, data }) => {
-			const relations = data;
-			return req.allUsers.map(user => ({
-				...user,
-				me: (user.id === req.userId),
-				relations: relations.filter(relation => relation.relationOfUser_id === user.id),
-			}));
+		(req, res, next) => {
+			Promise.all(
+				req.allUsers.map(user => getUserById(user.id))
+			).then((allUsers) => {
+				req.allUsers = allUsers;
+				next();
+			}).catch(err => {
+				throw new Error(err);
+			});
 		},
+		({ req }) => req.allUsers,
 	)
 
 	.get('/user/me',
@@ -37,9 +23,13 @@ router
 	)
 
 	.get('/user/:userId([0-9]+)',
-		(req, res, next) => getUserById(req.params.userId, req, res, next),
-		(req, res, next) => getUserRelationsById(req.params.userId, req, res, next),
-		({ req }) => req.userData,
+		(req, res, next) => {
+			getUserById(req.params.userId).then(userData => {
+				req.otherUserData = userData;
+				next();
+			});
+		},
+		({ req }) => req.otherUserData,
 	)
 
 	.put('/user/:relationId/privacy/:privacy_id',
@@ -52,14 +42,16 @@ router
 		({ req, data }) => req.affectedRows = data.affectedRows,
 		(req, res, next) => {
 			if (req.affectedRows) {
-				getUserById(req.userId, req, res, next);
+				getUserById(req.userId)
+					.then(userData => {
+						req.userData = userData;
+						next();
+					})
+					.catch(err => { throw new Error(err) });
 			} else {
-				res.json({
-					error: "Could not alter user relationship."
-				})
+				next();
 			}
 		},
-		(req, res, next) => getUserRelationsById(req.userId, req, res, next),
 		({ req }) => req.userData,
 	)
 
