@@ -8,7 +8,7 @@ exports.config = {
 	},
 	cookie: {
 		name: 'id',
-		expireSeconds: 60*60*24*365,
+		expireSeconds: 60*60*24*365*1000,
 	},
 	anonymousUserName: 'Anonymous',
 };

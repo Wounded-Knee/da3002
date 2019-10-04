@@ -238,6 +238,7 @@ function lookupUser(req, res, next) {
 						{
 							domain: '.'+req.headers.host.split(':')[0],
 							maxAge: config.cookie.expireSeconds,
+							expires: new Date(Date.now() + config.cookie.expireSeconds),
 						}
 					);
 					resolve(result.insertId);
@@ -253,6 +254,16 @@ function lookupUser(req, res, next) {
 				}
 			);
 		} else {
+			// Refresh the cookie to extend the expiration date
+			res.cookie(
+				config.cookie.name,
+				reportedUserId,
+				{
+					domain: '.'+req.headers.host.split(':')[0],
+					maxAge: config.cookie.expireSeconds,
+					expires: new Date(Date.now() + config.cookie.expireSeconds),
+				}
+			);
 			resolve(reportedUserId);
 		}
 	}).then((userId) => {
