@@ -12,6 +12,8 @@
     "debug": "~2.6.9",
     "express": "^4.16.4",
     "express-validation": "^1.0.2",
+    "forever": "^1.0.0",
+    "g": "^2.0.1",
     "http-errors": "~1.6.2",
     "jade": "~1.11.0",
     "joi": "^14.3.1",
